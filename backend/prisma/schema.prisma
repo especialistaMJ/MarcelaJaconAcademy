@@ -1,0 +1,258 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  MENTEE
+  MENTOR
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum SessionStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+
+model User {
+  id                String             @id @default(uuid())
+  email             String             @unique
+  username          String             @unique
+  passwordHash      String
+  firstName         String
+  lastName          String
+  role              UserRole           @default(MENTEE)
+  profilePhoto      String?
+  bio               String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  lastLogin         DateTime?
+  isActive          Boolean            @default(true)
+  emailVerified     Boolean            @default(false)
+  
+  // Security
+  failedLoginAttempts Int              @default(0)
+  accountLockedUntil  DateTime?
+  mfaEnabled          Boolean          @default(false)
+  mfaSecret           String?
+  
+  // Relations
+  mentorProfile     MentorProfile?
+  menteeProfile     MenteeProfile?
+  sessions          Session[]          @relation("SessionMentee")
+  reviews           Review[]           @relation("ReviewAuthor")
+  reports           Report[]           @relation("ReportAuthor")
+  refreshTokens     RefreshToken[]
+  
+  @@index([email])
+  @@index([username])
+}
+
+model MentorProfile {
+  id                    String              @id @default(uuid())
+  userId                String              @unique
+  user                  User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Verification
+  verificationStatus    VerificationStatus  @default(PENDING)
+  verifiedAt            DateTime?
+  governmentIdVerified  Boolean             @default(false)
+  backgroundCheckDone   Boolean             @default(false)
+  
+  // Professional Info
+  title                 String
+  expertise             String[]
+  yearsOfExperience     Int
+  industries            String[]
+  languages             String[]
+  education             Json[]             // Array of education objects
+  certifications        Json[]             // Array of certification objects
+  
+  // Availability & Pricing
+  hourlyRate            Float?
+  currency              String             @default("USD")
+  availability          Json?              // Weekly availability schedule
+  responseTime          Int?               // Average response time in hours
+  
+  // Ratings
+  averageRating         Float              @default(0)
+  totalReviews          Int                @default(0)
+  
+  // Session info
+  totalSessions         Int                @default(0)
+  completedSessions     Int                @default(0)
+  
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  
+  // Relations
+  sessions              Session[]          @relation("SessionMentor")
+  reviews               Review[]           @relation("ReviewMentor")
+  credentials           MentorCredential[]
+  
+  @@index([verificationStatus])
+  @@index([averageRating])
+}
+
+model MenteeProfile {
+  id                String    @id @default(uuid())
+  userId            String    @unique
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Profile
+  interests         String[]
+  goals             String[]
+  careerStage       String?
+  lookingFor        String?
+  
+  // Session info
+  totalSessions     Int       @default(0)
+  completedSessions Int       @default(0)
+  
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+}
+
+model MentorCredential {
+  id              String         @id @default(uuid())
+  mentorProfileId String
+  mentorProfile   MentorProfile  @relation(fields: [mentorProfileId], references: [id], onDelete: Cascade)
+  
+  type            String         // "education", "certification", "employment"
+  title           String
+  institution     String
+  description     String?
+  issueDate       DateTime?
+  expiryDate      DateTime?
+  verificationUrl String?
+  documentUrl     String?
+  verified        Boolean        @default(false)
+  
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+  
+  @@index([mentorProfileId])
+}
+
+model Session {
+  id              String        @id @default(uuid())
+  menteeId        String
+  mentorId        String
+  mentee          User          @relation("SessionMentee", fields: [menteeId], references: [id])
+  mentor          MentorProfile @relation("SessionMentor", fields: [mentorId], references: [id])
+  
+  scheduledAt     DateTime
+  duration        Int           // Duration in minutes
+  status          SessionStatus @default(SCHEDULED)
+  
+  // Session details
+  topic           String?
+  notes           String?
+  menteeNotes     String?       // Private notes for mentee
+  mentorNotes     String?       // Private notes for mentor
+  
+  // Recording (if enabled)
+  recordingUrl    String?
+  recordingConsent Boolean      @default(false)
+  
+  // Payment
+  amount          Float?
+  currency        String        @default("USD")
+  paid            Boolean       @default(false)
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  completedAt     DateTime?
+  cancelledAt     DateTime?
+  
+  @@index([menteeId])
+  @@index([mentorId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+model Review {
+  id              String        @id @default(uuid())
+  mentorId        String
+  authorId        String
+  mentor          MentorProfile @relation("ReviewMentor", fields: [mentorId], references: [id], onDelete: Cascade)
+  author          User          @relation("ReviewAuthor", fields: [authorId], references: [id])
+  
+  // Ratings (1-5 stars)
+  overallRating   Int
+  communication   Int
+  expertise       Int
+  helpfulness     Int
+  professionalism Int
+  value           Int
+  
+  // Review content
+  title           String?
+  content         String
+  
+  // Response from mentor
+  mentorResponse  String?
+  respondedAt     DateTime?
+  
+  // Verification
+  verified        Boolean       @default(true)  // Verified against session records
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@unique([mentorId, authorId])  // One review per mentee per mentor
+  @@index([mentorId])
+  @@index([overallRating])
+}
+
+model Report {
+  id              String        @id @default(uuid())
+  reporterId      String
+  reporter        User          @relation("ReportAuthor", fields: [reporterId], references: [id])
+  
+  reportedUserId  String        // ID of reported user
+  reportType      String        // "harassment", "fraud", "inappropriate", etc.
+  description     String
+  evidence        Json?         // Screenshots, URLs, etc.
+  
+  status          String        @default("pending")  // pending, investigating, resolved, dismissed
+  resolution      String?
+  resolvedAt      DateTime?
+  resolvedBy      String?       // Admin ID who resolved
+  
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  
+  @@index([reporterId])
+  @@index([reportedUserId])
+  @@index([status])
+}
+
+model RefreshToken {
+  id              String        @id @default(uuid())
+  userId          String
+  user            User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  token           String        @unique
+  expiresAt       DateTime
+  createdAt       DateTime      @default(now())
+  revoked         Boolean       @default(false)
+  
+  @@index([userId])
+  @@index([token])
+}
