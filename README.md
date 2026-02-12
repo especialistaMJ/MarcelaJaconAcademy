@@ -46,37 +46,43 @@ A secure and trustworthy mentorship platform connecting mentees with verified me
 
 ## 📋 Quick Start
 
-### Prerequisites
+**Want to get started quickly?** See [QUICKSTART.md](QUICKSTART.md) for a 5-minute setup guide.
+
+### Automated Setup
+
+```bash
+# Clone and run setup script
+git clone https://github.com/especialistaMJ/MarcelaJaconAcademy.git
+cd MarcelaJaconAcademy
+./setup.sh
+```
+
+### Manual Setup
+
+#### Prerequisites
 - Node.js 18+ 
 - PostgreSQL 14+
 - npm or yarn
 
-### Installation
+#### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/especialistaMJ/MarcelaJaconAcademy.git
-cd MarcelaJaconAcademy
-
-# Install backend dependencies
+# Backend
 cd backend
 npm install
-
-# Install frontend dependencies
-cd ../frontend
-npm install
-
-# Set up environment variables
 cp .env.example .env
-# Edit .env with your configuration
-
-# Run database migrations
-cd ../backend
+# Edit .env with your database URL
+npx prisma generate
 npm run migrate
+npm run dev
 
-# Start the development servers
+# Frontend (in a new terminal)
+cd frontend
+npm install
 npm run dev
 ```
+
+Visit http://localhost:3001 to see the platform!
 
 ## 🏗️ Project Structure
 
@@ -148,6 +154,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - Issues: [GitHub Issues](https://github.com/especialistaMJ/MarcelaJaconAcademy/issues)
 - Security: security@marcelajacon.academy
 
+## 🤝 Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
 ## 🙏 Acknowledgments
 
 Built with trust and safety as core principles for the mentorship community.
+
+---
+
+**Ready to start?** Check out [QUICKSTART.md](QUICKSTART.md) for a 5-minute setup guide!
